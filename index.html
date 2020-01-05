@@ -1,0 +1,1425 @@
+<html>
+<pre id="log"></pre>
+<head>
+  <title>Three.JS start</title>
+<style type="text/css">
+  body {margin 0;}
+  canvas {width 100%; height 100%;};
+
+  			body {
+  				font-family: Monospace;
+  				background-color: #000;
+  				color: #fff;
+  				margin: 0px;
+  				overflow: hidden;
+          z-index:0;
+  			}
+  			#info {
+  				position: absolute;
+  				top: 10px;
+  				width: 100%;
+          height: 13%;
+  				text-align: center;
+  				z-index: 100;
+  				display:block;
+          border:1px solid white;
+  			}
+        #timewarp{
+          position: absolute;
+          left: 10px;
+          height: 100px;
+          width: 200px;
+          top: 15%;
+
+          text-align: center;
+          line-height: 10px
+          z-index: -100;
+          display:block;
+          border:0px solid black;
+          background-color: rgb(252, 150, 73);
+        }
+        #rotieren{
+          position: absolute;
+          left: 10px;
+          height: 100px;
+          width: 200px;
+          top: 30%;
+
+          text-align: center;
+          line-height: 10px
+          z-index: -100;
+          display:block;
+          border:0px solid black;
+          background-color: rgb(252, 150, 73);
+
+        }
+        #translatieren{
+          position: absolute;
+          left: 10px;
+          height: 100px;
+          width: 200px;
+          top: 45%;
+
+          text-align: center;
+          line-height: 10px
+          z-index: -100;
+          display:block;
+          border:0px solid black;
+          background-color: rgb(252, 150, 73);
+        }
+        #clear{
+          position: absolute;
+          left: 10px;
+          height: 100px;
+          width: 200px;
+          top: 60%;
+
+          text-align: center;
+          line-height: 10px
+          z-index: -100;
+          display:block;
+          border:0px solid black;
+          background-color: rgb(252, 150, 73);
+        }
+
+  	h1{
+      color: rgb(255,48,48);
+
+    }
+    h2{
+      color: rgb(0,0,0);
+    }
+    b1{
+        color: rgb(0,0,0);
+    }
+
+    #p1 {background-color: rgb(252, 150, 73);}
+div{
+font-family:Verdana;font-size:12px;
+position:absolute; width:600px; height:100px;
+border:0px solid #000000;
+color:rgb(255,48,48);
+}
+
+</style>
+  </head>
+<body>
+
+  <div id="info">
+  		<h1>IMU Controls</h1>
+
+  		</div>
+      <div id="timewarp" style="display: table-cell; vertical-align: middle;">
+        <h2> Gestenerkennung </h2>
+        <b1>  Dreieck & Kugel </b1>
+      </div>
+
+      <div id="rotieren" style="display: table-cell; vertical-align: middle;">
+        <h2> Rotation </h2>
+      </div>
+      <div id="translatieren" style="display: table-cell; vertical-align: middle;">
+        <h2> Translation</h2>
+      </div>
+      <div id="clear" style="display: table-cell; vertical-align: middle;">
+        <h2> Clear </h2>
+      </div>
+
+
+
+      <div id="kalib" style="left:60%; top:10%; z-index:3;">
+    <span style="font-weight:bold;">HINWEIS</span>
+  Bitte zum Kalibrieren des Sensors auf die Vierecke zeigen und Knopf druecken!
+  <script src="js/three.min.js"></script>
+  <script src="js/dollar.js"></script>
+  <script>
+//WebSocket
+
+function log(msg) {
+  document.getElementById('log').textContent += msg + '\n\n\n';
+}
+
+var ws = new WebSocket('ws://raspberrypi:8080/');
+//if (!ws){
+//  var ws = new WebSocket('ws://192.168.0.197:8080/');
+//}
+//var ws = new WebSocket('ws://192.168.43.210:8080/');
+ws.onopen = function() {
+  console.log('CONNECT');
+};
+ws.onclose = function() {
+  console.log('DISCONNECT');
+};
+ws.onmessage = function(event){
+msg = JSON.parse(event.data);
+if(msg  !== null){
+  var init = true;
+}
+if(init==true){
+var stage=1;
+}
+
+}; // onmessage
+    var pl1AngleZ=0;
+    var pl1CFangleX=0;
+    var pl1CFangleY=0;
+    var pl2AngleZ=0;
+    var pl2CFangleX=0;
+    var pl2CFangleY=0;
+    var pl3AngleZ=0;
+    var pl3CFangleX=0;
+    var pl3CFangleY=0;
+    var pl4AngleZ=0;
+    var pl4CFangleX=0;
+    var pl4CFangleY=0;
+
+    var leftYawAngle =0;
+    var  rightYawAngle= 0;
+    var upperPitchAngle = 0;
+    var bottomPitchAngle = 0;
+    var YawDif=0;
+    var PitchDif=0;
+
+
+    var pPosY=0;
+    var YPos=0;
+    var XPos=0;
+    var pPosX=0;
+
+    var pixelBreite=15; //Pixel von lnR auf Schirm
+    var pixelBreiteP=5;
+
+    var moveAxis=0; //in welche richtung verschoben wird 0=oben, 1=unten 2=rechts 3=links;
+    var mode=0; //auswahl von rotation, translation..
+    var pushmode=0; //übergabe des mode
+    var modecc=0;
+    var gc=0; // counter für gesten
+
+    var recognizedGesture = new DollarRecognizer();
+    var gestureCompleted;
+    var pointarray = new Array();
+    var gestureName=0;
+
+
+    var distTo = new THREE.Vector3();
+
+    var inc=0;
+    var k=0;
+    var smth=0;
+    var b=0; //increment für das Dreieeck
+    var d=0; //austricksen des DOubleklicks
+    var q=0;
+    var l=0;
+    var pp=0;
+    var cc=0;
+    var caq=0;
+    var c1P=0; //kreispunkt 1
+    var c2P=0; //kreispunkt 2
+    var c1PY=0;
+    var c2PY=0;
+
+    var gesturePointsX;
+    var gesturePointsY;
+
+
+    var freeButton=true;
+    var defined= false;
+
+    var turnright=true; // zum drehen von objekten
+
+    var scene = new THREE.Scene();
+    // Kamera: 75 FOV, 0.1 near clipping plane, 1000 far clipping plane
+    var camera = new THREE.PerspectiveCamera(75,window.innerWidth / window.innerHeight, 0.1 , 1000);
+    var renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // form
+    var geometry = new THREE.BoxGeometry(1,1,1);
+
+    var pointGeo = new THREE.Geometry();
+    var pointMat= new THREE.PointsMaterial({color: 0x00afaf});
+    var pointMatTri = new THREE.PointsMaterial({color: 0x00ffaf});
+    var pointer = new THREE.Points(pointGeo,pointMat);
+
+    var pointerTri = new THREE.Points(pointGeo,pointMatTri);
+    var pointerTri2 = new THREE.Points(pointGeo,pointMatTri);
+    var pointerTri3 = new THREE.Points(pointGeo,pointMatTri);
+    var pointerTri4 = new THREE.Points(pointGeo,pointMatTri);
+
+    var PointerReset=0;
+
+
+
+// zurücksetzen des Pointers auf 0,0 um Drift zu beheben:
+    window.addEventListener('keydown', function(event){
+      switch(event.keyCode){
+        case 32: // Spacebar
+							PointerReset=1;
+              console.log("PointerReset");
+              var act_Angle=msg.AngleZ;
+              leftYawAngle=msg.AngleZ-(YawDif/2);
+              rightYawAngle=msg.AngleZ+(YawDif/2);
+							break;
+      }
+    });
+
+
+
+    var star = new THREE.Vector3();
+
+
+    star.set(0,0,-10);
+
+    pointGeo.vertices.push(star);
+
+    scene.add(pointer);
+
+    //material, farbe, texture
+
+    var material = new THREE.MeshBasicMaterial({color: 0xFFFFFF, wireframe: true});
+    var cube = new THREE.Mesh(geometry, material);
+    scene.add(cube);
+    cube.position.x=10;
+    cube.position.y=3;
+    cube.position.z=-5;
+
+    camera.position.z=3;
+
+    cube.rotation.x=0;
+    cube.rotation.y= 0;
+    cube.rotation.z=0;
+
+
+    var planeGeo = new THREE.PlaneGeometry( 0.5, 0.5, );
+    //var planeTri = new THREE.PlaneGeometry(0.2,0.2);
+    var planeTri = new THREE.SphereGeometry( 5, 32, 32 );
+    var planeMat = new THREE.MeshBasicMaterial( {color: 0xffff00, side: THREE.DoubleSide} );
+    var plane = new THREE.Mesh( planeGeo, planeMat );
+    var plane2 = new THREE.Mesh( planeGeo, planeMat );
+    var plane3 = new THREE.Mesh( planeGeo, planeMat );
+    var plane4 = new THREE.Mesh( planeGeo, planeMat );
+  //  var planeTri1 = new THREE.Mesh( planeGeo, planeMat );
+    var planeTri1 = new THREE.Mesh( planeTri, planeMat );
+    var planeTri2 = new THREE.Mesh( planeTri, planeMat );
+    var planeTri3 = new THREE.Mesh( planeTri, planeMat );
+    scene.add( plane );
+        scene.add( plane2 );
+            scene.add( plane3 );
+                scene.add( plane4 );
+            scene.add(pointerTri);
+
+
+            //Dreiecks
+            var geom = new THREE.Geometry();
+
+            var v1 = new THREE.Vector3(0,0,-5);   // Vector3 used to specify position
+            var v2 = new THREE.Vector3(3,0,-5);
+            var v3 = new THREE.Vector3(0,1,-5)
+
+            var tri= new THREE.Triangle(v1,v2,v3);
+            var normal = tri.getNormal();
+
+            geom.vertices.push(tri.a);
+            geom.vertices.push(tri.b);
+            geom.vertices.push(tri.c);
+
+            console.log( 'Area of triangle is: '+ tri.getArea() );
+
+
+            geom.faces.push( new THREE.Face3( 0, 1, 2, normal ) );
+
+          var redMat = new THREE.MeshBasicMaterial({ color: 0x4286f4 })
+
+            var triangle = new THREE.Mesh(geom, redMat);
+
+            var raycaster = new THREE.Raycaster();
+            var mouse = new THREE.Vector2();
+
+
+
+//zweites Dreieck: sehr unschön sorry!
+
+var newTriGeo = new THREE.Geometry();
+
+var t1 = new THREE.Vector3(0,0,-5);   // Vector3 used to specify position
+var t2 = new THREE.Vector3(3,0,-5);
+var t3 = new THREE.Vector3(0,1,-5)
+
+var newTri= new THREE.Triangle(t1,t2,t3);
+var newNormal = newTri.getNormal();
+
+
+newTriGeo.vertices.push(newTri.a);
+newTriGeo.vertices.push(newTri.b);
+newTriGeo.vertices.push(newTri.c);
+
+newTriGeo.faces.push( new THREE.Face3( 0, 1, 2, newNormal ) );
+
+var NewTriangle = new THREE.Mesh(newTriGeo, redMat);
+
+
+
+
+
+    stage=2; //initlisieren der Kalibrierung:
+
+
+    //logik der visualisierung
+    var update = function (){
+
+
+      calib();
+    //  logCalib();
+    //      scene.add(triangle);
+    //Normalisierte BIlschirmkoordinaten!
+    mouse.x = (XPos+1)/YawDif;
+    mouse.y = (YPos+1)/PitchDif;
+
+    //setInterval(show,3000); // Aufrufen der Mauspostion
+
+    if(stage==6){
+      calcPointPos();
+
+      pointer.position.x=XPos;
+      pointer.position.y=YPos;
+      pointer.position.z=0.1;
+
+      pointer.verticesNeedsUpdate=true;
+      pointer.__dirtyVertices = true;
+      pointGeo.verticesNeedsUpdate=true;
+      triangle.elementsNeedUpdate=true;
+      geom.elementsNeedUpdate=true;
+
+
+
+      // Zeichnen des Dreiecks ##############################################################################
+        if(b==0){
+          console.log('b==0');
+          if (d<=20){
+            msg.button=0;
+            d=d+1;
+          }
+
+        if(msg.button==1){
+          console.log('puh');
+
+          pointerTri.position.x=XPos;
+          pointerTri.position.y=YPos;
+          scene.add(pointerTri);
+
+
+          //v1 = new THREE.Vector3(XPos,YPos,-5);
+    //      v1.x=XPos;
+    //      v1.y=YPos;
+          v1.x=pointerTri.position.x;
+          v1.y=pointerTri.position.y;
+          v1.z=-10;
+      //    scene.add(pointerTri).preventDefault();
+        console.log(pointerTri.position.x);
+        console.log(pointerTri.position.y);
+          console.log(v1.x);
+          console.log(v1.y);
+          schlafen();
+          d=0;
+          b=1;
+        }
+      }
+
+      //}//b=0;
+      if(b==1){
+        if (q<=20){
+          msg.button=0;
+          q=q+1;
+        }
+    //    console.log('b==1');
+        if(msg.button==1){
+          pointerTri2.position.x=XPos;
+          pointerTri2.position.y=YPos;
+          scene.add(pointerTri2);
+        //  v2 = new THREE.Vector3(XPos,YPos,-5);
+        v2.x=pointerTri2.position.x;
+        v2.y=pointerTri2.position.y;
+          //v2.x=XPos;
+          //v2.y=YPos;
+          v2.z=-10;
+          console.log(pointerTri2.position.x);
+          console.log(pointerTri2.position.y);
+          console.log(v2.x);
+          console.log(v2.y);
+
+          schlafen();
+          b=2
+          q=0;
+        //  b=2;
+
+        }
+      }//b=1;
+
+      if(b==2){
+        if (l<=20){
+          msg.button=0;
+          l=l+1;
+        }
+    //    console.log('b==2');
+        if(msg.button==1){
+
+          pointerTri3.position.x=XPos;
+          pointerTri3.position.y=YPos;
+          scene.add(pointerTri3);
+          //v3 = new THREE.Vector3(XPos,YPos,-5);
+          schlafen();
+          v3.x=XPos;
+          v3.y=YPos;
+          v3.z=-10;
+
+
+          tri=  new THREE.Triangle(v1,v2,v3);
+          normal = tri.getNormal();
+          console.log(normal);
+
+
+          triangle.dynamic=true;
+
+          geom.vertices.push(tri.a);
+          geom.vertices.push(tri.b);
+          geom.vertices.push(tri.c);
+
+          console.log( 'Area of triangle is: '+ tri.getArea() );
+
+          geom.faces.push( new THREE.Face3( 0, 1, 2, normal ) );
+
+          //geom.vertices.push(v1);
+          //geom.vertices.push(v2);
+          //geom.vertices.push(v3);
+
+
+
+        //  geom.faces.push( new THREE.Face3( 0, 1, 2 ) );
+
+          scene.add(triangle);
+
+          geom.verticesNeedsUpdate=true;
+
+
+          l=0;
+          b=3;
+        }
+      }//b==2;
+
+      if(b==3){
+        scene.remove(pointerTri);
+        scene.remove(pointerTri2);
+        scene.remove(pointerTri3);
+
+
+
+
+
+
+        tri=  new THREE.Triangle(v1,v2,v3);
+        normal = tri.getNormal();
+        //tri.scale.x=-1;
+      //  triangle.scale.x=-1;
+
+        //console.log(v1,v2,v3);
+        //console.log(" ");
+        //console.log(XPos,YPos);
+
+                  geom.vertices.push(tri.a);
+                  geom.vertices.push(tri.b);
+                  geom.vertices.push(tri.c);
+
+      console.log( 'Area of triangle is: '+ tri.getArea() );
+/*
+      if(tri.containsPoint(XPos,YPos,-10)==true){
+        console.log("Punkt liegt auf Dreieck");
+      }
+
+      if(tri.containsPoint(0,0,0)==true){
+        console.log("DoppelNull!");
+      }
+      if(tri.containsPoint(0,0,0)==false){
+        console.log("falsche Null!");
+      }
+      */
+
+
+      geom.verticesNeedsUpdate=true;
+
+      //stage=7;
+      chooseMode();
+      }
+
+//############################################################################Dreieck
+
+
+
+
+
+  }
+
+  if(stage==7){
+  //  console.log("7");
+    stageInit();
+
+    drawCirc();
+
+
+
+
+    }
+if(stage==8){ // rotieren
+  document.getElementById('kalib').innerHTML="Rotation";
+  stageInit();
+
+  fMoveAxis();
+  ray();
+  chooseMode();
+}
+
+if(stage==9){ //translation
+  document.getElementById('kalib').innerHTML="Translation";
+  stageInit();
+  fMoveAxis();
+  ray2();
+  //setInterval(show,3000);
+  chooseMode();
+  console.log("stage==9");
+
+}
+if(stage==10){ //timewarp
+//  pushmode=-1;
+//  console.log("stage==10");
+
+  document.getElementById('kalib').innerHTML="Knopf drücken um Geste auf zu nehmen (im Uhrzeigersinn)";
+  scene.remove (triangle);
+
+//  scene.remove(circle);
+  stageInit();
+  //chooseMode();
+  if(preventreset=false){
+  gc=0;
+  }
+
+
+  if(msg.button==1){
+    preventreset=true;
+
+    var DPoints= new Point(XPos+50,YPos+50);
+    //console.log(DPoints);
+
+    pointarray[gc]=DPoints;
+    //pointarray.splice(10,pointarray.length);
+    gc=gc+1;
+    console.log(pointarray);
+    //console.log(gc);
+    //console.log(preventreset);
+    gestureCompleted=1;
+  }
+  else if(msg.button==0 && gestureCompleted==1) {
+    recognizedGesture= new DollarRecognizer().Recognize(pointarray,false);
+    //console.log("recognizedGesture= " + recognizedGesture);
+    gestureCompleted=0;
+    console.log("name :" + recognizedGesture.Name);
+    var keys = Object.keys(recognizedGesture);
+    gestureName=recognizedGesture.Name;
+    gestureCompleted=2;
+
+    console.log(gestureName);
+
+
+    //console.log(keys);
+  }
+  else if (msg.button==0 && gestureCompleted==2){
+    if(recognizedGesture.Name=="triangle"){
+          console.log("TRIANGLe erkannt");
+  //else{
+      b=0;
+      cc=0;
+      stage=13;
+      gestureCompleted=0
+    }
+
+
+    else if(recognizedGesture.Name=="circle"){
+      console.log("CIRKEL ERKANnt");
+      b=0;
+      cc=0;
+      stage=12;
+      gestureCompleted=0;
+
+    }
+    else{
+      document.getElementById('kalib').innerHTML=("Erkannt wurde: "+ recognizedGesture.Name);
+      gc=0;
+      pointarray=[];
+
+    }
+  }
+  else{
+    preventreset=false;
+    gc=0;
+    pointarray=[];
+  }
+/*
+  if(gestureName=="circle"){
+  //  console.log("hier");
+    b=0;
+    cc=0;
+    stage=12;
+  //  pushmode=0;
+  }
+  if(gestureName=="triangle"){
+  //  console.log("hier");
+    b=0;
+    cc=0;
+    stage=13;
+    pushmode=-1;
+  }
+*/
+  //console.log(preventreset);
+
+
+
+}//Gestenerkennung
+
+if(stage==11){
+    //clear
+  stageInit();
+  //scene.children{};
+  for( var i = scene.children.length - 1; i >= 0; i--) {
+    obj = scene.children[i];
+       scene.remove(obj);
+     }
+     scene.add(pointer);
+     scene.add(cube);
+     fMoveAxis();
+     chooseMode();
+     stage=15;
+
+}
+if(stage==12){
+  recognizedGesture=0;
+  gestureName=0;
+  console.log("stage=12, kreis");
+  pushmode=0;
+  stageInit();
+  fMoveAxis();
+  chooseMode();
+  drawCirc();
+}
+if(stage==13){
+  pushmode=0;
+//  console.log("stage==13");
+  //b=0;
+  //cc=0;
+  stageInit();
+  fMoveAxis();
+  chooseMode();
+  drawTriangle();
+}
+
+if(stage==15){
+ //IDLE
+ document.getElementById('kalib').innerHTML="IDLE";
+ stageInit();
+ fMoveAxis();
+ chooseMode();
+ //pushmode=-1;
+
+}
+
+
+
+
+
+
+
+
+
+  //  pointGeo.vertices.push(new THREE.Vector3(2, YPos, -5));
+//pointGeo.vertices.set(2,YPos,-5);
+
+//scene.add(texture);
+//positionen der planes
+
+plane.position.x= -3.8;
+plane.position.y= -1.9;
+
+plane2.position.x=3.8;
+plane2.position.y=1.9;
+
+plane3.position.x=-3.8;
+plane3.position.y=1.9;
+
+plane4.position.x=3.8;
+plane4.position.y=-1.9;
+
+  //plane.rotation.y+=0.01;
+
+
+if(k==0){
+  firstA=msg.AngleZ;
+  k=1;
+}
+
+   cube.rotation.z = msg.CFangleX/57.291;
+   cube.rotation.x = msg.CFangleY/57.291;
+  // cube.rotation.y = ((msg.AngleZ-firstA)/57.291);
+  cube.rotation.y = (msg.AngleZ/57.291);
+
+
+}//UPDATE ENDE
+    // Szene zeichnen
+    var render = function(){
+      renderer.render(scene, camera);
+    }
+    // LOOP (update, render, repeat)
+    var GameLoop = function(){
+      requestAnimationFrame(GameLoop);
+      update( );
+      render( );
+
+
+    };
+
+    GameLoop();
+
+
+
+function startCalibration(){
+  console.log('start der Kalibrierung');
+  var stage=2;
+}
+function catchDoubleClicks(){
+  freeButton=false;
+  do{
+  if(freeButton==false){
+  inc = inc+1;
+ console.log(inc);
+  }
+  if(inc==60){
+    freeButton=true;
+    inc=-1; //bei -1 triggern des aufrufes durch den Knopf
+  }
+  if(inc==-1){
+    console.log('ausführen der Funktion');
+    inc=0;
+  }
+}while(inc!==0);
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function schlafen() {
+  sleeping=true;
+  console.log('Taking a break...');
+  await sleep(1000);
+  sleeping=false;
+}
+
+function calib() {
+  if(stage==2){
+    scene.add( plane );
+    scene.remove( plane2 );
+    scene.remove( plane3 );
+    scene.remove( plane4 );
+    if(msg.button==1){
+      console.log(msg.AngleZ);
+          pl1AngleZ=msg.AngleZ;
+          pl1CFangleX=msg.CFangleX;
+          pl1CFangleY=msg.CFangleY;
+      schlafen();
+      stage=3;
+
+    }
+  }
+
+  if(stage==3){
+    scene.remove( plane );
+    scene.add( plane2 );
+    scene.remove( plane3 );
+    scene.remove( plane4 );
+    if(sleeping==false){
+      console.log('sleeping==false');
+    if(msg.button==1){
+          pl2AngleZ=msg.AngleZ;
+          pl2CFangleX=msg.CFangleX;
+          pl2CFangleY=msg.CFangleY;
+
+      schlafen();
+
+      stage=4;
+    }//sleeping
+
+  }
+  }//stage=3
+
+  if(stage==4){
+    scene.remove( plane );
+    scene.remove( plane2 );
+    scene.add( plane3 );
+    scene.remove( plane4 );
+    if(sleeping==false){
+
+    if(msg.button==1){
+      pl3AngleZ=msg.AngleZ;
+      pl3CFangleX=msg.CFangleX;
+      pl3CFangleY=msg.CFangleY;
+    schlafen();
+      stage=5;
+
+  }
+  }//stage=4
+}
+  if(stage==5){
+    scene.remove( plane );
+    scene.remove( plane2 );
+    scene.remove( plane3 );
+    scene.add( plane4 );
+      if(sleeping==false){
+    if(msg.button==1){
+      pl4AngleZ=msg.AngleZ;
+      pl4CFangleX=msg.CFangleX;
+      pl4CFangleY=msg.CFangleY;
+
+
+      stage=6;
+      console.log('Werte zur KALIBRIERUNG gespeichert');
+    //  document.getElementById('kalib').remove();
+    document.getElementById('kalib').innerHTML="IDLE";
+      scene.remove(plane4);
+
+      console.log(pl1AngleZ);
+      console.log(pl1CFangleX);
+      console.log(pl1CFangleY);
+      console.log(pl2AngleZ);
+      console.log(pl2CFangleX);
+      console.log(pl2CFangleY);
+      console.log(pl3AngleZ);
+      console.log(pl3CFangleX);
+      console.log(pl3CFangleY);
+      console.log(pl4AngleZ);
+      console.log(pl4CFangleX);
+      console.log(pl4CFangleY);
+      calcWindow();
+
+
+
+  }
+  }
+  }
+
+  //ausgeben der Kalibrierten Winkel:
+
+
+}
+
+function calcWindow(){
+   leftYawAngle = (pl1AngleZ+pl3AngleZ)/2;
+  //  leftYawAngle = (pl1AngleZ);
+   rightYawAngle= (pl2AngleZ+pl4AngleZ)/2;
+   //rightYawAngle= (pl2AngleZ);
+   upperPitchAngle = (pl3CFangleY+pl2CFangleY)/2;
+   bottomPitchAngle = (pl1CFangleY+pl4CFangleY)/2;
+   YawDif=Math.abs(rightYawAngle-leftYawAngle);
+   if(YawDif>=180){
+     if (leftYawAngle>=rightYawAngle){
+       leftYawAngle=leftYawAngle-360;
+       YawDif=Math.abs(rightYawAngle-leftYawAngle);
+     }
+     else{
+       rightYawAngle=rightYawAngle-360;
+      YawDif=Math.abs(rightYawAngle-leftYawAngle);
+     }
+   }
+
+
+
+   PitchDif=Math.abs(upperPitchAngle-bottomPitchAngle);
+
+  console.log("left Yaw: ",leftYawAngle);
+  console.log("right Yaw: ", rightYawAngle);
+  console.log("upper Pitch", upperPitchAngle);
+  console.log("bottomPitchAngle", bottomPitchAngle);
+  console.log("YawDif", YawDif);
+  console.log("PitchDif", PitchDif);
+
+
+}
+
+function ray(){
+  console.log("ray");
+  raycaster.setFromCamera(mouse,camera);
+  var intersects = raycaster.intersectObjects(scene.children,true);
+  //console.log(mouse);
+
+  for ( var i = 0; i < intersects.length; i++ ) {
+  //  console.log();
+  //    console.log(intersects);
+      if(intersects[i].object.geometry.type==!Point){
+  		intersects[ i ].object.material.color.set( 0xff0000 );
+    }
+    //  console.log(intersects[i]);
+
+    imuRotate();
+  //  console.log(msg.accfy);
+
+    if(msg.button==1){
+      if(turnright=true){
+
+          intersects[ i ].object.rotation.y-= msg.accfy/500;
+      }
+    //  if(turnright=false){
+    //      intersects[ i ].object.rotation.x-= 0.02;
+      //}
+
+    }
+  }
+}
+
+    function ray2(){
+    //  console.log("ray2");
+      raycaster.setFromCamera(mouse,camera);
+      var intersects = raycaster.intersectObjects(scene.children,true);
+      //console.log(mouse);
+
+      for ( var i = 0; i < intersects.length; i++ ) {
+      //  console.log();
+      //    console.log(intersects);
+          if(intersects[i].object.geometry.type==!Point){
+      		intersects[ i ].object.material.color.set( 0xff0000 );
+        }
+        //  console.log(intersects[i]);
+
+        imuRotate();
+      //  console.log(msg.accfy);
+
+        if(msg.button==1){
+        //  console.log("wa");
+          if(moveAxis==2){
+          //    setInterval(show,3000)
+              intersects[ i ].object.position.x+=0.02;
+          }
+          if(moveAxis==3){
+            intersects[ i ].object.position.x-=0.02;
+          }
+          if(moveAxis==0){
+            intersects[ i ].object.position.y+=0.02;
+          }
+          if(moveAxis==1){
+            intersects[ i ].object.position.y-=0.02;
+          }
+
+        //  if(turnright=false){
+        //      intersects[ i ].object.rotation.x-= 0.02;
+          //}
+
+        }
+
+
+    }
+
+
+
+
+//intersects[1].object.material.color.set(0x4286f4);
+
+
+
+    geom.verticesNeedsUpdate=true;
+    tri.verticesNeedsUpdate=true;
+
+
+
+}
+
+function imuRotate(){
+  //entweder links oder rechts rum rotieren:
+
+  if(msg.accfy<=0){
+    turnright=true;
+  }
+  if(msg.accfy>=0){
+    turnright=false;
+  }
+  console.log(turnright);
+
+}
+
+function calcPointPos(){
+
+var m = 2*pixelBreite/YawDif;
+var mP = 2*pixelBreiteP/PitchDif;
+var midP= (upperPitchAngle+bottomPitchAngle)/2;
+var mid= (leftYawAngle+rightYawAngle)/2;
+
+if (leftYawAngle<=rightYawAngle){
+
+}
+else{
+m=-m;
+//leftY=leftYawAngle
+console.log("else triggered");
+}
+
+
+var xx = msg.AngleZ-mid;
+var yy = msg.CFangleY-midP;
+YPos= yy*mP;
+XPos= xx*m;
+//XPos=-XPos;
+
+//console.log("xposition", XPos);
+
+
+//  var resol=YawDif/window.innerWidth;
+//  console.log(resol);
+  //if(msg.AngleZ>=leftYawAngle){
+    //var temp= Math.abs(leftYawAngle-msg.AngleZ);
+  //  console.log("temp: ", temp);
+    //YPos= Math.round(YawDif-temp);
+    //console.log("yPos: ", YPos);
+    //pPosY=(resol*YPos-(window.innerWidth/2)/57.2);
+  //  console.log(pPosY);
+  //}
+
+
+
+}
+// Abfangen von DOppelklicks;
+function dirtyIntercept(){
+    if(caq<=20){
+      msg.button=0;
+      caq=caq+1; // CAQ in abgefanger Funktion zurücksetzen!
+    }
+
+}
+function drawCirc(){
+      if(cc==0){
+      //  document.getElementById('kalib').add();
+          document.getElementById('kalib').innerHTML="Kugel zeichnen!";
+        dirtyIntercept();
+        console.log("cc=0");
+      if(msg.button==1){
+        c1P=XPos;
+        c1PY=YPos;
+        schlafen();
+        cc=1;
+        caq=0;
+
+        document.getElementById('kalib').innerHTML="erster Punkt gesetzt";
+      }
+    }
+
+      if(cc==1){
+        dirtyIntercept();
+        if(msg.button==1){
+        c2P=XPos;
+        c2PY=YPos;
+
+        cc=2;
+        schlafen();
+        caq=0;
+        }
+      }
+      if(cc==2){
+        cRadius=Math.abs(c2P-c1P);
+        cYPos=c2PY-c1PY;
+      //  cRadius=c2P-c1P;
+      //  console.log(c1P);
+      //  console.log(c2P);
+      //  console.log(cRadius);
+        console.log(cRadius);
+
+        var circ = new THREE.SphereGeometry( cRadius*2/3, 32,32 );
+        var circMat = new THREE.MeshBasicMaterial( { color: 0x48d6c3,wireframe: true } );
+        var circle = new THREE.Mesh( circ, circMat );
+        circle.position.z=-5;
+        circle.position.x=((c2P-c1P)/2)+c1P;
+        circle.position.y=(cYPos/2)+c1PY;
+
+        pointer.position.z=0.1;
+
+        scene.add(circle);
+        document.getElementById('kalib').innerHTML="Kugel gezeichnet!";
+        cc=0;
+        //stage=8;
+        stage=9;
+      }
+}
+
+function stageInit(){
+    // damit die punkte berechnet werden /geupdated und der Pointer läuft
+    calcPointPos();
+    pointer.verticesNeedsUpdate=true;
+    pointer.__dirtyVertices = true;
+    pointGeo.verticesNeedsUpdate=true;
+    triangle.elementsNeedUpdate=true;
+    geom.elementsNeedUpdate=true;
+    pointer.position.x=XPos;
+    pointer.position.y=YPos;
+
+}
+
+
+
+function show(){
+
+  //console.log(mouse.x + ", " + mouse.y);
+  console.log("Xpos,yPos: ", XPos + ", " +YPos );
+}
+
+function fMoveAxis(){
+  //Zum erkennen der Neigung
+
+var a = [Math.abs(msg.accfx), Math.abs(msg.accfy)];
+var indexOfMaxValue = a.reduce((iMax, x, i, arr) => x > arr[iMax] ? i : iMax, 0);
+
+if(indexOfMaxValue==0){
+  if(msg.accfx<=0){
+    moveAxis=0;
+  }
+  else{
+    moveAxis=1;
+  }
+}//==0
+if(indexOfMaxValue==1){
+  if(msg.accfy<=0){
+    moveAxis=2;
+  }
+  else{
+    moveAxis=3;
+  }
+}
+//console.log(moveAxis);
+
+}//moveaxis
+
+function chooseMode(){
+  if (XPos <=-17 && XPos >=-25){
+    if(YPos>=-1 && YPos <=1){
+      mode=1;
+      modecc+=1;
+      //Translation
+    }
+    if(YPos>=2 && YPos <=4){
+      mode=2;
+      modecc+=1;
+      //Translation
+    }
+    if(YPos>=4.5 && YPos <=7){
+      mode=3;
+      modecc+=1;
+      //Translation
+    }
+    if(YPos<=-2 && YPos >=-4){
+      mode=4;
+      modecc+=1;
+    }
+
+    if(modecc==10){
+      pushmode=mode;
+      modecc=0;
+      mode=0;
+    }
+
+  }
+  else{
+    modecc=0;
+  }
+
+  if(pushmode==1){
+    document.getElementById("translatieren").style.backgroundColor='red';
+    document.getElementById("rotieren").style.backgroundColor='blue';
+    document.getElementById("timewarp").style.backgroundColor='blue';
+    document.getElementById("clear").style.backgroundColor='blue';
+    stage=9;
+  }
+  if(pushmode==2){
+    document.getElementById("rotieren").style.backgroundColor='red';
+    document.getElementById("translatieren").style.backgroundColor='blue';
+    document.getElementById("timewarp").style.backgroundColor='blue';
+    document.getElementById("clear").style.backgroundColor='blue';
+    stage=8;
+  }
+  if(pushmode==3){
+    document.getElementById("timewarp").style.backgroundColor='red';
+    document.getElementById("translatieren").style.backgroundColor='blue';
+    document.getElementById("rotieren").style.backgroundColor='blue';
+    document.getElementById("clear").style.backgroundColor='blue';
+    stage=10;
+  }
+  if(pushmode==4){
+    document.getElementById("timewarp").style.backgroundColor='blue';
+    document.getElementById("translatieren").style.backgroundColor='blue';
+    document.getElementById("rotieren").style.backgroundColor='blue';
+    document.getElementById("clear").style.backgroundColor='red';
+    stage=11;
+  }
+  if(pushmode==-1){
+    document.getElementById("timewarp").style.backgroundColor='blue';
+    document.getElementById("translatieren").style.backgroundColor='blue';
+    document.getElementById("rotieren").style.backgroundColor='blue';
+    document.getElementById("clear").style.backgroundColor='blue';
+  }
+
+
+
+
+//console.log("mode: " + mode);
+//console.log("cc: " +modecc);
+//console.log("pushmode= "+ pushmode);
+}
+
+function drawTriangle(){
+
+  document.getElementById('kalib').innerHTML="Dreieck zeichnen! Gegen den Uhrzeigersinn";
+
+
+
+  //scene.add(NewTriangle);
+
+  pointer.verticesNeedsUpdate=true;
+  pointer.__dirtyVertices = true;
+  pointGeo.verticesNeedsUpdate=true;
+  newTri.elementsNeedUpdate=true;
+  newTriGeo.elementsNeedUpdate=true;
+  pointerTri.elementsNeedUpdate=true;
+  pointerTri2.elementsNeedUpdate=true;
+  pointerTri3.elementsNeedUpdate=true;
+  normal.elementsNeedUpdate=true;
+
+  if(b==0){
+    console.log('b==0');
+    if (d<=20){
+      msg.button=0;
+      d=d+1;
+    }
+
+    if(msg.button==1){
+      console.log('puh');
+
+      pointerTri.position.x=XPos;
+      pointerTri.position.y=YPos;
+      scene.add(pointerTri);
+
+      t1.x=pointerTri.position.x;
+      t1.y=pointerTri.position.y;
+      t1.z=-10;
+
+      console.log(pointerTri.position.x);
+      console.log(pointerTri.position.y);
+      console.log(t1.x);
+      console.log(t1.y);
+      schlafen();
+      d=0;
+      b=1;
+    }
+  }
+
+  //}//b=0;
+  if(b==1){
+    console.log("B==1");
+    if (q<=20){
+      msg.button=0;
+      q=q+1;
+    }
+//    console.log('b==1');
+    if(msg.button==1){
+      pointerTri2.position.x=XPos;
+      pointerTri2.position.y=YPos;
+      scene.add(pointerTri2);
+    //  v2 = new THREE.Vector3(XPos,YPos,-5);
+      t2.x=pointerTri2.position.x;
+      t2.y=pointerTri2.position.y;
+      //v2.x=XPos;
+      //v2.y=YPos;
+      t2.z=-10;
+      console.log(pointerTri2.position.x);
+      console.log(pointerTri2.position.y);
+      console.log(t2.x);
+      console.log(t2.y);
+
+      schlafen();
+      b=2
+      q=0;
+    //  b=2;
+
+    }
+  }//b=1;
+
+  if(b==2){
+    console.log("B==2");
+    if (l<=20){
+      msg.button=0;
+      l=l+1;
+    }
+
+    if(msg.button==1){
+
+      pointerTri3.position.x=XPos;
+      pointerTri3.position.y=YPos;
+      scene.add(pointerTri3);
+      //v3 = new THREE.Vector3(XPos,YPos,-5);
+      schlafen();
+      t3.x=pointerTri3.position.x
+      t3.y=pointerTri3.position.y;
+      t3.z=-10;
+        console.log(t1);
+          console.log(t2);
+      console.log(t3);
+
+
+      newTri= new THREE.Triangle(t1,t2,t3);
+      newNormal = newTri.getNormal();
+      console.log(newTri);
+
+
+      newTri.dynamic=true;
+
+      newTriGeo.vertices.push(newTri.a);
+      newTriGeo.vertices.push(newTri.b);
+      newTriGeo.vertices.push(newTri.c);
+
+      console.log( 'Area of triangle is: '+ newTri.getArea() );
+
+      newTriGeo.faces.push( new THREE.Face3( 0, 1, 2, newNormal ) );
+
+      NewTriangle = new THREE.Mesh(newTriGeo, redMat);
+
+      scene.add(NewTriangle);
+
+      newTriGeo.verticesNeedsUpdate=true;
+
+
+
+
+      l=0;
+      b=3;
+
+
+}
+}
+if(b==3){
+  scene.remove(pointerTri);
+  scene.remove(pointerTri2);
+  scene.remove(pointerTri3);
+
+  scene.add(NewTriangle);
+
+}
+
+
+
+
+}
+
+
+
+</script>
+
+</body>
+</html>
